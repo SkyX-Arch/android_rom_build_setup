@@ -73,7 +73,7 @@ ensure_terminal
 # (e.g. env vars pre-set, or answering "n" to the interactive prompts).
 
 MANIFEST_URL="${MANIFEST_URL:-https://github.com/LineageOS/android.git}"   # ROM manifest repo
-MANIFEST_BRANCH="${MANIFEST_BRANCH:-lineage-21.0}"                          # ROM branch
+MANIFEST_BRANCH="${MANIFEST_BRANCH:-lineage-23.2}"                          # ROM branch
 
 LOCAL_MANIFEST_REPO="${LOCAL_MANIFEST_REPO:-https://github.com/SkyX-Arch/local_manifest_device_plato.git}"
 LOCAL_MANIFEST_BRANCH="${LOCAL_MANIFEST_BRANCH:-main}"
