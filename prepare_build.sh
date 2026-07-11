@@ -73,7 +73,7 @@ ensure_terminal
 # (e.g. env vars pre-set, or answering "n" to the interactive prompts).
 
 MANIFEST_URL="${MANIFEST_URL:-https://github.com/LineageOS/android.git}"   # ROM manifest repo
-MANIFEST_BRANCH="${MANIFEST_BRANCH:-lineage-23.2}"                          # ROM branch
+MANIFEST_BRANCH="${MANIFEST_BRANCH:-lineage-21.0}"                          # ROM branch
 
 LOCAL_MANIFEST_REPO="${LOCAL_MANIFEST_REPO:-https://github.com/SkyX-Arch/local_manifest_device_plato.git}"
 LOCAL_MANIFEST_BRANCH="${LOCAL_MANIFEST_BRANCH:-main}"
@@ -292,30 +292,30 @@ install_dependencies() {
 
     case "$PKG_MANAGER" in
         apt)
-            PACKAGES="git-core gnupg flex bison build-essential zip curl zlib1g-dev \
+            PACKAGES="git-core git-lfs gnupg flex bison build-essential zip curl zlib1g-dev \
                       libc6-dev-i386 libncurses-dev x11proto-core-dev libx11-dev \
                       lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig \
                       python3 python3-pip openjdk-11-jdk bc rsync schedtool imagemagick \
                       lib32ncurses-dev lib32readline-dev lib32z1 ccache"
             ;;
         dnf)
-            PACKAGES="git gnupg flex bison make automake gcc gcc-c++ zip curl \
+            PACKAGES="git git-lfs gnupg flex bison make automake gcc gcc-c++ zip curl \
                       zlib-devel ncurses-devel libxml2 libxslt unzip fontconfig \
                       python3 python3-pip java-11-openjdk-devel bc rsync \
                       ImageMagick ccache glibc-devel.i686 ncurses-devel.i686"
             ;;
         pacman)
-            PACKAGES="git gnupg flex bison base-devel zip curl zlib ncurses \
+            PACKAGES="git git-lfs gnupg flex bison base-devel zip curl zlib ncurses \
                       libxml2 libxslt unzip fontconfig python python-pip jdk11-openjdk \
                       bc rsync imagemagick ccache lib32-glibc lib32-ncurses"
             ;;
         zypper)
-            PACKAGES="git gpg2 flex bison make gcc gcc-c++ zip curl zlib-devel \
+            PACKAGES="git git-lfs gpg2 flex bison make gcc gcc-c++ zip curl zlib-devel \
                       ncurses-devel libxml2-tools libxslt-tools unzip fontconfig \
                       python3 python3-pip java-11-openjdk-devel bc rsync ImageMagick ccache"
             ;;
         brew)
-            PACKAGES="git gnupg coreutils gnu-sed gawk python3 openjdk@11 ccache rsync"
+            PACKAGES="git git-lfs gnupg coreutils gnu-sed gawk python3 openjdk@11 ccache rsync"
             ;;
     esac
 
@@ -415,6 +415,16 @@ configure_git_identity() {
     fi
 
     git config --global color.ui auto
+
+    if command -v git-lfs >/dev/null 2>&1; then
+        if git lfs install --skip-repo >/tmp/prepare_build.log 2>&1; then
+            success "git-lfs hooks initialized (large files will download fully, not just pointers)"
+        else
+            warn "git-lfs found but 'git lfs install' failed - check /tmp/prepare_build.log"
+        fi
+    else
+        warn "git-lfs not found - large files in the manifest may only sync as pointer stubs"
+    fi
 }
 
 # ------------------------- Step 5: repo init -------------------------------
@@ -479,6 +489,21 @@ run_repo_sync() {
         success "repo sync completed successfully"
     else
         die "repo sync failed. Re-run 'repo sync' manually inside $WORK_DIR to see full errors."
+    fi
+
+    if command -v git-lfs >/dev/null 2>&1; then
+        info "Fetching any remaining git-lfs objects (in case some repos synced as pointers)..."
+        local lfs_dirs
+        lfs_dirs=$(find "$WORK_DIR" -maxdepth 4 -type d -name ".git" -exec test -d '{}/lfs' \; -print 2>/dev/null)
+        if [ -n "$lfs_dirs" ]; then
+            local d
+            while IFS= read -r d; do
+                (cd "$(dirname "$d")" && git lfs pull >/dev/null 2>&1)
+            done <<< "$lfs_dirs"
+            success "git-lfs objects fetched for repos that use LFS"
+        else
+            info "No git-lfs-tracked repos detected, nothing extra to fetch"
+        fi
     fi
 }
 
